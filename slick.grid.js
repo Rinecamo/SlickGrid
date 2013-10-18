@@ -2663,6 +2663,13 @@ if (typeof Slick === "undefined") {
                 renderRows({
                     top: actualFrozenRow, bottom: getDataLength() - 1, leftPx: rendered.leftPx, rightPx: rendered.rightPx
                 });
+            } else {
+                renderRows({
+                     top: 0
+                    ,bottom: actualFrozenRow - 1
+                    ,leftPx: rendered.leftPx
+                    ,rightPx: rendered.rightPx
+                });
             }
 
             postProcessFromRow = visible.top;
