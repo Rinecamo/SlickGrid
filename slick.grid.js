@@ -140,6 +140,7 @@ if (typeof Slick === "undefined") {
             cellWidthDiff = 0,
             cellHeightDiff = 0;
         var absoluteColumnMinWidth;
+        var numberOfRows = 0;
         var hasFrozenRows = false;
         var frozenRowsHeight = 0;
         var actualFrozenRow = -1;
@@ -950,6 +951,7 @@ if (typeof Slick === "undefined") {
                 tolerance: "intersection",
                 helper: "clone",
                 placeholder: "slick-sortable-placeholder ui-state-default slick-header-column",
+                forcePlaceholderSize: true,
                 start: function (e, ui) {
                     ui.placeholder.width(ui.helper.outerWidth() - headerColumnWidthDiff);
                     $(ui.helper).addClass("slick-header-column-active");
@@ -1461,8 +1463,8 @@ if (typeof Slick === "undefined") {
                 unregisterPlugin(plugins[i]);
             }
 
-            if (options.enableColumnReorder) {
-                $headers.filter(":ui-sortable").sortable("destroy");
+            if (options.enableColumnReorder && $headers.sortable) {
+                $headers.sortable("destroy");
             }
 
             unbindAncestorScrollEvents();
@@ -1849,6 +1851,8 @@ if (typeof Slick === "undefined") {
                 }
 
                 $viewportScrollContainerY[0].scrollTop = newScrollTop;
+
+                scrollTop = newScrollTop;
 
                 trigger(self.onViewportChanged, {});
             }
@@ -3613,7 +3617,7 @@ if (typeof Slick === "undefined") {
                 + (viewportHasHScroll ? scrollbarDimensions.height : 0);
 
             // need to page down?
-            if ((row + 1) * options.rowHeight > scrollTop + viewportScrollH + offset) {
+            if ((row + 1) * options.rowHeight > scrollTop + viewportScrollH + offset - (viewportHasHScroll ? scrollbarDimensions.height : 0)) {
                 scrollTo(doPaging ? rowAtTop : rowAtBottom);
                 render();
             }
@@ -4118,10 +4122,11 @@ if (typeof Slick === "undefined") {
                         // check whether the lock has been re-acquired by event handlers
                         return !getEditorLock().isActive();
                     } else {
-                        // Re-add the CSS class to trigger transitions, if any.
-                        $(activeCellNode).removeClass("invalid");
-                        $(activeCellNode).width();  // force layout
+                        // TODO: remove and put in onValidationError handlers in examples
                         $(activeCellNode).addClass("invalid");
+                        $(activeCellNode).stop(true, true).effect("highlight", {
+                            color: "red"
+                        }, 300);
 
                         trigger(self.onValidationError, {
                             editor: currentEditor,
