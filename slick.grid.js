@@ -3630,37 +3630,53 @@ if (typeof Slick === "undefined") {
         }
 
         function scrollPage(dir) {
-            var deltaRows = dir * numVisibleRows;
-            scrollTo((getRowFromPosition(scrollTop) + deltaRows) * options.rowHeight);
-            render();
+			var numFrozenRows = options.frozenRow > 0 ? options.frozenRow : 0,
+				numVisibleRows = Math.floor( viewportH / options.rowHeight ),
+				numVisibleUnfrozenRows = numVisibleRows - numFrozenRows,
+				deltaRows,
+				newFirstRow
+				;
 
-            if (options.enableCellNavigation && activeRow != null) {
-                var row = activeRow + deltaRows;
-                var dataLengthIncludingAddNew = getDataLengthIncludingAddNew();
-                if (row >= dataLengthIncludingAddNew) {
-                    row = dataLengthIncludingAddNew - 1;
-                }
-                if (row < 0) {
-                    row = 0;
-                }
+			if (activeRow != null) {
+				if (activeRow >= numFrozenRows) {
+					deltaRows = dir * numVisibleUnfrozenRows;
+				} else {
+					deltaRows = dir * ( numFrozenRows - activeRow );
+				}
+				newFirstRow = activeRow + deltaRows;
+			} else {
+				newFirstRow = getRowFromPosition( scrollTop ) + numVisibleRows;
+			}
+			scrollRowIntoView( newFirstRow );
+			render();
 
-                var cell = 0, prevCell = null;
-                var prevActivePosX = activePosX;
-                while (cell <= activePosX) {
-                    if (canCellBeActive(row, cell)) {
-                        prevCell = cell;
-                    }
-                    cell += getColspan(row, cell);
-                }
 
-                if (prevCell !== null) {
-                    setActiveCellInternal(getCellNode(row, prevCell));
-                    activePosX = prevActivePosX;
-                } else {
-                    resetActiveCell();
-                }
-            }
-        }
+			if (options.enableCellNavigation && activeRow != null) {
+				var row = activeRow + deltaRows;
+				if (row >= numberOfRows) {
+					row = numberOfRows - 1;
+				}
+				if (row < 0) {
+					row = 0;
+				}
+
+				var cell = 0, prevCell = null;
+				var prevActivePosX = activePosX;
+				while (cell <= activePosX) {
+					if (canCellBeActive(row, cell)) {
+						prevCell = cell;
+					}
+					cell += getColspan(row, cell);
+				}
+
+				if (prevCell !== null) {
+					setActiveCellInternal(getCellNode(row, prevCell));
+					activePosX = prevActivePosX;
+				} else {
+					resetActiveCell();
+				}
+			}
+		}
 
         function navigatePageDown() {
             scrollPage(1);
