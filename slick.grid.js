@@ -2391,25 +2391,29 @@ if (typeof Slick === "undefined") {
             return range;
         }
 
-        function ensureCellNodesInRowsCache(row) {
-            var cacheEntry = rowsCache[row];
-            if (cacheEntry) {
-                if (cacheEntry.cellRenderQueue.length) {
-                    var $lastNode = cacheEntry.rowNode.children().last();
-                    while (cacheEntry.cellRenderQueue.length) {
-                        var columnIdx = cacheEntry.cellRenderQueue.pop();
 
-                        cacheEntry.cellNodesByColumnIdx[columnIdx] = $lastNode;
-                        $lastNode = $lastNode.prev();
+		//Needed for IE8 since he can't deal with a NodeList in the slice.call-function and because it's faster than the slice.call-function
+		function slice(arr) {
+			var result = [];
+			for (var i = -1, l = arr.length >>> 0; ++i !== l; result[i] = arr[i]);
+			return result;
+		}
 
-                        // Hack to retrieve the frozen columns because
-                        if ($lastNode.length == 0) {
-                            $lastNode = $(cacheEntry.rowNode[0]).children().last();
-                        }
-                    }
-                }
-            }
-        }
+		function ensureCellNodesInRowsCache(row) {
+			var cacheEntry = rowsCache[row];
+			var frozen = cacheEntry.rowNode.length > 1; // without frozencolumns there is only one rowNode
+			if (cacheEntry) {
+				if (cacheEntry.cellRenderQueue.length) {
+					var firstCells = slice(cacheEntry.rowNode[0].childNodes);
+					if (frozen) {
+						var firstCells = firstCells.concat(slice(cacheEntry.rowNode[1].childNodes));
+					}
+					cacheEntry.cellNodesByColumnIdx = firstCells;
+				}
+				cacheEntry.cellRenderQueue = [];
+			}
+		}
+
 
         function cleanUpCells(range, row) {
             // Ignore frozen rows
@@ -2448,17 +2452,16 @@ if (typeof Slick === "undefined") {
                 }
             }
 
-            var cellToRemove;
-            while ((cellToRemove = cellsToRemove.pop()) != null) {
-                cacheEntry.cellNodesByColumnIdx[cellToRemove][0].parentElement.removeChild(cacheEntry.cellNodesByColumnIdx[cellToRemove][0]);
-                delete cacheEntry.cellColSpans[cellToRemove];
-                delete cacheEntry.cellNodesByColumnIdx[cellToRemove];
-                if (postProcessedRows[row]) {
-                    delete postProcessedRows[row][cellToRemove];
-                }
-                totalCellsRemoved++;
-            }
-        }
+			var cellToRemove;
+			while ((cellToRemove = cellsToRemove.pop()) != null) {
+				cacheEntry.cellNodesByColumnIdx[cellToRemove].parentElement.removeChild(cacheEntry.cellNodesByColumnIdx[cellToRemove]);
+				delete cacheEntry.cellColSpans[cellToRemove];
+				delete cacheEntry.cellNodesByColumnIdx[cellToRemove];
+				if (postProcessedRows[row]) {
+					delete postProcessedRows[row][cellToRemove];
+				}
+			}
+		}
 
         function cleanUpAndRenderCells(range) {
             var cacheEntry;
@@ -2530,24 +2533,22 @@ if (typeof Slick === "undefined") {
             var x = document.createElement("div");
             x.innerHTML = stringArray.join("");
 
-            var processedRow;
-            var $node;
-            while ((processedRow = processedRows.pop()) != null) {
-                cacheEntry = rowsCache[processedRow];
-                var columnIdx;
-                while ((columnIdx = cacheEntry.cellRenderQueue.pop()) != null) {
-                    $node = $(x).children().last();
-
-                    if (( options.frozenColumn > -1 ) && ( columnIdx > options.frozenColumn )) {
-                        $(cacheEntry.rowNode[1]).append($node);
-                    } else {
-                        $(cacheEntry.rowNode[0]).append($node);
-                    }
-
-                    cacheEntry.cellNodesByColumnIdx[columnIdx] = $node;
-                }
-            }
-        }
+			var processedRow;
+			var node;
+			while ((processedRow = processedRows.pop()) != null) {
+				cacheEntry = rowsCache[processedRow];
+				var columnIdx;
+				while ((columnIdx = cacheEntry.cellRenderQueue.pop()) != null) {
+					node = x.lastChild;
+					if ((options.frozenColumn > -1) && (columnIdx > options.frozenColumn)) {
+						cacheEntry.rowNode[1].appendChild(node);
+					} else {
+						cacheEntry.rowNode[0].appendChild(node);
+					}
+					cacheEntry.cellNodesByColumnIdx[columnIdx] = node;
+				}
+			}
+		}
 
         function renderRows(range) {
             var stringArrayL = [],
@@ -2598,25 +2599,29 @@ if (typeof Slick === "undefined") {
             x.innerHTML = stringArrayL.join("");
             xRight.innerHTML = stringArrayR.join("");
 
-            for (var i = 0, ii = rows.length; i < ii; i++) {
-                if (( hasFrozenRows ) && ( rows[i] >= actualFrozenRow )) {
-                    if (options.frozenColumn > -1) {
-                        rowsCache[rows[i]].rowNode = $()
-                            .add($(x.firstChild).appendTo($canvasBottomL))
-                            .add($(xRight.firstChild).appendTo($canvasBottomR));
-                    } else {
-                        rowsCache[rows[i]].rowNode = $()
-                            .add($(x.firstChild).appendTo($canvasBottomL));
-                    }
-                } else if (options.frozenColumn > -1) {
-                    rowsCache[rows[i]].rowNode = $()
-                        .add($(x.firstChild).appendTo($canvasTopL))
-                        .add($(xRight.firstChild).appendTo($canvasTopR));
-                } else {
-                    rowsCache[rows[i]].rowNode = $()
-                        .add($(x.firstChild).appendTo($canvasTopL));
-                }
-            }
+			for (var i = 0, ii = rows.length; i < ii; i++) {
+				if ((hasFrozenRows) && (rows[i] >= actualFrozenRow)) {
+					if (options.frozenColumn > -1) {
+						rowNodes = [x.firstChild, xRight.firstChild];
+						$canvasBottomL[0].appendChild(rowNodes[0]);
+						$canvasBottomR[0].appendChild(rowNodes[1]);
+						rowsCache[rows[i]].rowNode = rowNodes;
+					} else {
+						rowNodes = [x.firstChild];
+						rowsCache[rows[i]].rowNode = rowNodes;
+						$canvasBottomL[0].appendChild(rowNodes[0]);
+					}
+				} else if (options.frozenColumn > -1) {
+					rowNodes = [x.firstChild, xRight.firstChild];
+					$canvasTopL[0].appendChild(rowNodes[0]);
+					$canvasTopR[0].appendChild(rowNodes[1]);
+					rowsCache[rows[i]].rowNode = rowNodes;
+				} else {
+					rowNodes = [x.firstChild];
+					rowsCache[rows[i]].rowNode = rowNodes;
+					$canvasTopL[0].appendChild(rowNodes[0]);
+				}
+			}
 
             if (needToReselectCell) {
                 activeCellNode = getCellNode(activeRow, activeCell);
@@ -3333,8 +3338,8 @@ if (typeof Slick === "undefined") {
 
                 cell = getCellFromPoint($activeCellOffset.left, Math.ceil($activeCellOffset.top) - rowOffset);
 
-                activeRow = cell.row;
-                activeCell = activePosX = activeCell = activePosX = getCellFromNode(activeCellNode[0]);
+				activeRow = cell.row;
+				activeCell = activePosX = activeCell = activePosX = getCellFromNode(activeCellNode);
 
                 $activeCellNode.addClass("active");
                 if (rowsCache[activeRow]) {
@@ -3418,7 +3423,7 @@ if (typeof Slick === "undefined") {
                 if (d) {
                     var column = columns[activeCell];
                     var formatter = getFormatter(activeRow, column);
-                    activeCellNode[0].innerHTML = formatter(activeRow, activeCell, getDataItemValueForColumn(d, column), column, d);
+                    activeCellNode.innerHTML = formatter(activeRow, activeCell, getDataItemValueForColumn(d, column), column, d);
                     invalidatePostProcessingResults(activeRow);
                 }
             }
@@ -3472,7 +3477,7 @@ if (typeof Slick === "undefined") {
             currentEditor = new (editor || getEditor(activeRow, activeCell))({
                 grid: self,
                 gridPosition: absBox($container[0]),
-                position: absBox(activeCellNode[0]),
+                position: absBox(activeCellNode),
                 container: activeCellNode,
                 column: columnDef,
                 item: item || {},
@@ -3549,7 +3554,7 @@ if (typeof Slick === "undefined") {
         }
 
         function getActiveCellPosition() {
-            return absBox(activeCellNode[0]);
+            return absBox(activeCellNode);
         }
 
         function getGridPosition() {
